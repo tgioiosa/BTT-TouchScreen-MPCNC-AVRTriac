@@ -101,13 +101,13 @@ void menuDialog(void)
     switch (key_num)
     {
       case KEY_POPUP_CONFIRM:
-        infoMenu.cur--;
+        infoMenu.cur--;           //TG this sets back to previous menu before popup, basically clearing the popup
         if (action_ok != NULL)
           action_ok();
         break;
 
       case KEY_POPUP_CANCEL:
-        infoMenu.cur--;
+        infoMenu.cur--;           //TG this sets back to previous menu before popup, basically clearing the popup
         if (action_cancel != NULL)
           action_cancel();
         break;

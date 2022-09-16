@@ -1,3 +1,4 @@
+//TG MODIFIED*****
 #include "interfaceCmd.h"
 #include "includes.h"
 
@@ -50,8 +51,11 @@ void commonStoreCmd(GCODE_QUEUE *pQueue, const char* format, va_list va)
   pQueue->count++;
 }
 
-// Store gcode cmd to infoCmd queue, this cmd will be sent by UART in sendQueueCmd(),
-// If the infoCmd queue is full, reminde in title bar.
+// Store gcode cmd to infoCmd queue (aka pQueue), this cmd will be sent by UART in sendQueueCmd(),
+// If the infoCmd queue is full, it sets a reminder in title bar.
+//TG - note that once the queue gets full and the busy reminder is set, it will not go
+//     away unless the queue empties. If comm gets stuck or the code goes nuts and nothing
+//     empties the queue, the "Busy processing....please wait" message displays infinitely!
 bool storeCmd(const char * format,...)
 {
   if (strlen(format) == 0) return false;
@@ -73,7 +77,8 @@ bool storeCmd(const char * format,...)
 }
 
 // Store gcode cmd to infoCmd queue, this cmd will be sent by UART in sendQueueCmd(),
-// If the infoCmd queue is full, reminde in title bar,  waiting for available queue and store the command.
+// If the infoCmd queue is full, set reminder in title bar,  waiting for available
+// queue and store the command. Will sit here infinitely if queue not available!!
 void mustStoreCmd(const char * format,...)
 {
   if (strlen(format) == 0) return;
@@ -152,7 +157,8 @@ void mustStoreCacheCmd(const char * format,...)
 {
   GCODE_QUEUE *pQueue = &infoCacheCmd;
 
-  if (pQueue->count == CMD_MAX_LIST) reminderMessage(LABEL_BUSY, STATUS_BUSY);
+  if (pQueue->count == CMD_MAX_LIST) 
+    reminderMessage(LABEL_BUSY, STATUS_BUSY);
 
   while (pQueue->count >= CMD_MAX_LIST)
   {
@@ -215,8 +221,8 @@ void sendDequeuedCmd(char * gcode, bool avoid_terminal)
 // Parse and send gcode cmd in infoCmd.
 void sendQueueCmd(void)
 {
-  if (infoHost.wait == true) return;
-  if (infoCmd.count == 0) return;
+  if (infoHost.wait == true)    return;    // wait to send flag set?
+  if (infoCmd.count == 0)       return;    // no commands to send?
 
   bool avoid_terminal = false;
   uint16_t  cmd = 0;
@@ -244,6 +250,10 @@ void sendQueueCmd(void)
       switch (cmd)
       {
         case 0:
+		  //TG this was in prior versions, but not in V27, not needed M0 & M1 are the same command so fall thru to M1
+          //if (isPrinting())
+          //  setPrintPause(true,true);
+          //break;
         case 1:
           if (isPrinting() && infoMachineSettings.firmwareType != FW_REPRAPFW)  // Abort printing by "M0" in RepRapFirmware
           {
@@ -445,7 +455,9 @@ void sendQueueCmd(void)
               sendDequeuedCmd(gcode, avoid_terminal);
 
               mustStoreScript("M105\nM114\nM220\n");
+#if EXTRUDER_NUM > 0    //TG 9/1/22 added this test             
               storeCmd("M221 D%d\n", heatGetCurrentTool());
+#endif
               ispolling = true;
               return;
             }
@@ -853,10 +865,12 @@ void sendQueueCmd(void)
             speedSetCurPercent(0, cmd_value());
           break;
 
+#if EXTRUDER_NUM > 0    //TG 9/1/22 added this test 
         case 221:  // M221
           if (cmd_seen('S'))
             speedSetCurPercent(1, cmd_value());
           break;
+#endif
 
         #ifdef BUZZER_PIN
           case 300:  // M300

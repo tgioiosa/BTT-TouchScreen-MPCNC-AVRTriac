@@ -39,15 +39,16 @@ void Hardware_GenericInit(void)
     GPIO_PinRemapConfig(GPIO_Remap_USART2, ENABLE);
   #endif
 
-  XPT2046_Init();
-  OS_TimerInitMs();        // System clock timer, cycle 1ms, called after XPT2046_Init()
-  W25Qxx_Init();
-  LCD_Init();
-  readStoredPara();        // Read settings parameter
-  LCD_RefreshDirection();  // refresh display direction after reading settings
-  scanUpdates();           // scan icon, fonts and config files
-  checkflashSign();        // check font/icon/config signature in SPI flash for update
-  initMachineSetting();    // load default machine settings
+  XPT2046_Init();           // init Touchscreen controller
+  OS_TimerInitMs();         // System clock timer, cycle 1ms, called after XPT2046_Init()
+  W25Qxx_Init();            // init W25Q64 - 64Mbit flash chip
+  LCD_Init();               // init LCD to rgb, set screen black, and enable backlight
+  readStoredPara();         // Read settings parameters from MCU flash area 0x08004000 - 0x08004300  (768 bytes)
+  LCD_RefreshDirection();   // refresh display direction after reading settings
+  scanUpdates();            // scan icon, fonts and config files for updates (boot.c)
+  checkflashSign();         // check font/icon/config signature in SPI flash for update if needed
+  initMachineSetting();     // load default machine settings, sets infoMachineSettings.isMarlinFirmware = -1
+  //readMarlinAVRInfoBlock(400); // initial read of settings from AVR Triac controller
 
   #ifdef LED_COLOR_PIN
     knob_LED_Init();
@@ -94,6 +95,7 @@ void Hardware_GenericInit(void)
   #ifdef LCD_LED_PWM_CHANNEL
     Set_LCD_Brightness(LCD_BRIGHTNESS[infoSettings.lcd_brightness]);
   #endif
+  
   switchMode();
 }
 
@@ -105,8 +107,13 @@ int main(void)
 
   Hardware_GenericInit();
 
-  for (; ;)
-  {
-    (*infoMenu.menu[infoMenu.cur])();
-  }
+  //TG 8/5/22 try to reset AVR controller to sync to current stored presets
+  mustStoreCmd("%s \n", "M7980");         //TG send cmd to Marlin to request AVR reset
+  TFTtoMARLIN_wait(comp_7980);
+
+
+  for(;;)                                 // infinite loop on whatever menu is currently at the top
+  {                                       // of infoMenu.menu stack, after restart this will be menuStatus
+    (*infoMenu.menu[infoMenu.cur])();     
+  }                                     
 }
